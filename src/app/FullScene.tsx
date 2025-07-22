@@ -19,6 +19,8 @@ function ArmTestingPosModel(props: any) {
         child.material.wireframe = true;
         child.material.transparent = true;
         child.material.opacity = 0.5;
+        child.material.depthTest = false;
+        child.renderOrder = 999;
       }
     });
   }, [scene]);
@@ -84,6 +86,12 @@ function ArmTestingPosModel(props: any) {
 // Preload para performance
 if (typeof window !== 'undefined') useGLTF.preload && useGLTF.preload('/armTestingPos.glb');
 
+function FloorModel(props: any) {
+  const group = useRef<Group>(null);
+  const { scene } = useGLTF('/floor.glb');
+  return <primitive ref={group} object={scene} {...props} />;
+}
+
 function ArmAttachedToCamera(props: any) {
   const { camera, scene } = useThree();
   const ref = useRef<Group>(null);
@@ -102,7 +110,7 @@ function ArmAttachedToCamera(props: any) {
 
   // Ajuste a posição para onde o braço deve aparecer na tela
   return (
-    <group ref={ref} position={[0, -2, -1]} scale={[3, 3, 3]} rotation={[0.2, Math.PI, 0]} {...props}>
+    <group ref={ref} position={[-0.1, -0.5, 0.3]} scale={[1, 1, 1]} rotation={[0, Math.PI, 0]} {...props}>
       <ArmTestingPosModel />
     </group>
   );
@@ -130,12 +138,13 @@ export default function FullScene() {
         <Suspense fallback={null}>
           <PerspectiveCamera 
             makeDefault 
-            position={[0, 0.77688, -0.589039]} 
+            position={[0, 1.2, -0.589039]} 
             fov={50} 
           />
           <ambientLight intensity={0.5} />
           <directionalLight position={[5, 10, 7]} intensity={1} castShadow />
           <ArmAttachedToCamera />
+          <FloorModel position={[0, 0, 0]} />
           <Grid infiniteGrid cellColor="#444" sectionColor="#888" fadeDistance={40} />
           <AxesHelperPrimitive size={2} />
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
