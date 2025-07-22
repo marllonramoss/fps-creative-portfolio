@@ -1,8 +1,9 @@
 "use client";
 import React, { Suspense, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera, Environment, useGLTF } from "@react-three/drei";
+import { PointerLockControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera, Environment, useGLTF } from "@react-three/drei";
 import { Group, AxesHelper } from "three";
+import { useFrame } from "@react-three/fiber";
 
 function ArmTestingPosModel(props: any) {
   const group = useRef<Group>(null);
@@ -11,6 +12,30 @@ function ArmTestingPosModel(props: any) {
 }
 // Preload para performance
 if (typeof window !== 'undefined') useGLTF.preload && useGLTF.preload('/armTestingPos.glb');
+
+function ArmAttachedToCamera(props: any) {
+  const { camera, scene } = useThree();
+  const ref = useRef<Group>(null);
+
+  useEffect(() => {
+    if (ref.current && camera && !camera.children.includes(ref.current)) {
+      camera.add(ref.current);
+      scene.remove(ref.current);
+    }
+    return () => {
+      if (ref.current && camera.children.includes(ref.current)) {
+        camera.remove(ref.current);
+      }
+    };
+  }, [camera, scene]);
+
+  // Ajuste a posição para onde o braço deve aparecer na tela
+  return (
+    <group ref={ref} position={[0, -2, -1]} scale={[3, 3, 3]} rotation={[0.2, Math.PI, 0]} {...props}>
+      <ArmTestingPosModel />
+    </group>
+  );
+}
 
 function AxesHelperPrimitive({ size = 2 }) {
   const ref = useRef<any>();
@@ -39,7 +64,7 @@ export default function FullScene() {
           />
           <ambientLight intensity={0.5} />
           <directionalLight position={[5, 10, 7]} intensity={1} castShadow />
-          <ArmTestingPosModel position={[-0.1, 0, 0]} />
+          <ArmAttachedToCamera />
           <Grid infiniteGrid cellColor="#444" sectionColor="#888" fadeDistance={40} />
           <AxesHelperPrimitive size={2} />
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
@@ -47,7 +72,7 @@ export default function FullScene() {
           </GizmoHelper>
           <Environment preset="city" background={false} />
         </Suspense>
-        <OrbitControls makeDefault target={[0, 0.7, 0]} />
+        <PointerLockControls />
       </Canvas>
     </div>
   );
