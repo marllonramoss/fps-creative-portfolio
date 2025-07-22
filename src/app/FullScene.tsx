@@ -138,7 +138,7 @@ export default function FullScene() {
         <Suspense fallback={null}>
           <PerspectiveCamera 
             makeDefault 
-            position={[0, 1.2, -0.589039]} 
+            position={[0, 1.2, 0]} 
             fov={50} 
           />
           <ambientLight intensity={0.5} />
