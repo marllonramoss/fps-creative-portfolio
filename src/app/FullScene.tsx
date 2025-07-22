@@ -8,6 +8,18 @@ import { useFrame } from "@react-three/fiber";
 function ArmTestingPosModel(props: any) {
   const group = useRef<Group>(null);
   const { scene } = useGLTF('/armTestingPos.glb');
+
+  // Torna todos os materiais wireframe e transparentes
+  React.useEffect(() => {
+    scene.traverse((child: any) => {
+      if (child.isMesh && child.material) {
+        child.material.wireframe = true;
+        child.material.transparent = true;
+        child.material.opacity = 0.5;
+      }
+    });
+  }, [scene]);
+
   return <primitive ref={group} object={scene} {...props} />;
 }
 // Preload para performance
