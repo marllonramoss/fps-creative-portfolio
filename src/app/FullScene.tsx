@@ -1,16 +1,20 @@
 "use client";
-import React, { Suspense, useRef, useEffect } from "react";
+import React, { Suspense, useRef, useEffect, useState, forwardRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PointerLockControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera, Environment, useGLTF } from "@react-three/drei";
 import { Group, AxesHelper, AnimationMixer } from "three";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useSpring, a } from '@react-spring/three';
 
 function ArmTestingPosModel(props: any) {
+  const { hovered, clickTrigger } = props;
   const group = useRef<Group>(null);
   const { scene, animations } = useGLTF('/hoho.glb');
   const mixer = React.useRef<AnimationMixer | null>(null);
-  const action = React.useRef<any>(null);
+  const hoverInAction = React.useRef<any>(null);
+  const hoverOutAction = React.useRef<any>(null);
+  const pressAction = React.useRef<any>(null);
 
   // Torna todos os materiais wireframe e transparentes
   React.useEffect(() => {
@@ -25,56 +29,62 @@ function ArmTestingPosModel(props: any) {
     });
   }, [scene]);
 
-  // Loga as animações do modelo
-  React.useEffect(() => {
-    if (animations && animations.length > 0) {
-      console.log('GLB Animations:', animations);
-    } else {
-      console.log('GLB não possui animações.');
-    }
-  }, [animations]);
-
-  // Setup AnimationMixer e evento de clique
+  // Setup AnimationMixer e hoverIn/hoverOut actions
   React.useEffect(() => {
     if (!group.current || !animations || animations.length === 0) return;
     mixer.current = new AnimationMixer(group.current);
-    // Procura a animação chamada 'press'
-    const clip = animations.find((a: any) => a.name === 'press');
-    let onFinish: ((event: any) => void) | undefined;
-    if (clip) {
-      action.current = mixer.current.clipAction(clip);
-      action.current.setLoop(THREE.LoopOnce, 1);
-      action.current.clampWhenFinished = true;
-      action.current.paused = false;
-      action.current.enabled = true;
-      action.current.stop();
-      action.current.reset();
-      (action.current as any)._hasPlayed = false;
-      // Listener para liberar novo clique
-      onFinish = (event: any) => {
-        if (event.action === action.current) {
-          (action.current as any)._hasPlayed = false;
-        }
-      };
-      mixer.current.removeEventListener('finished', onFinish);
-      mixer.current.addEventListener('finished', onFinish);
+    const hoverInClip = animations.find((a: any) => a.name === 'hoverIn');
+    if (hoverInClip) {
+      hoverInAction.current = mixer.current.clipAction(hoverInClip);
+      hoverInAction.current.setLoop(THREE.LoopOnce, 1);
+      hoverInAction.current.clampWhenFinished = true;
+      hoverInAction.current.enabled = true;
+      hoverInAction.current.stop();
+      hoverInAction.current.reset();
     }
-    // Handler para clique esquerdo
-    const handleClick = (e: MouseEvent) => {
-      if (e.button === 0 && action.current) {
-        if (!(action.current as any)._hasPlayed) {
-          action.current.reset().play();
-          (action.current as any)._hasPlayed = true;
-        }
-      }
-    };
-    window.addEventListener('mousedown', handleClick);
+    const hoverOutClip = animations.find((a: any) => a.name === 'hoverOut' || a.name === 'hoverOut!');
+    if (hoverOutClip) {
+      hoverOutAction.current = mixer.current.clipAction(hoverOutClip);
+      hoverOutAction.current.setLoop(THREE.LoopOnce, 1);
+      hoverOutAction.current.clampWhenFinished = true;
+      hoverOutAction.current.enabled = true;
+      hoverOutAction.current.stop();
+      hoverOutAction.current.reset();
+    }
+    const pressClip = animations.find((a: any) => a.name === 'press');
+    if (pressClip) {
+      pressAction.current = mixer.current.clipAction(pressClip);
+      pressAction.current.setLoop(THREE.LoopOnce, 1);
+      pressAction.current.clampWhenFinished = true;
+      pressAction.current.enabled = true;
+      pressAction.current.stop();
+      pressAction.current.reset();
+    }
     return () => {
-      window.removeEventListener('mousedown', handleClick);
       if (mixer.current) mixer.current.stopAllAction();
-      if (mixer.current && onFinish) mixer.current.removeEventListener('finished', onFinish);
     };
   }, [animations]);
+
+  // Executa hoverIn/hoverOut conforme hovered
+  React.useEffect(() => {
+    if (hovered && hoverInAction.current) {
+      mixer.current?.stopAllAction();
+      hoverInAction.current.reset().play();
+    } else if (!hovered) {
+      if (hoverOutAction.current) {
+        mixer.current?.stopAllAction();
+        hoverOutAction.current.reset().play();
+      }
+    }
+  }, [hovered]);
+
+  // Executa press quando clickTrigger mudar
+  React.useEffect(() => {
+    if (pressAction.current && clickTrigger > 0) {
+      mixer.current?.stopAllAction();
+      pressAction.current.reset().play();
+    }
+  }, [clickTrigger]);
 
   // Atualiza o mixer a cada frame
   useFrame((_, delta) => {
@@ -91,6 +101,7 @@ function FloorModel(props: any) {
 }
 
 function ArmAttachedToCamera(props: any) {
+  const { hovered, clickTrigger } = props;
   const { camera, scene } = useThree();
   const ref = useRef<Group>(null);
 
@@ -109,24 +120,34 @@ function ArmAttachedToCamera(props: any) {
   // Ajuste a posição para onde o braço deve aparecer na tela
   return (
     <group ref={ref} position={[-0.1, -0.5, 0.3]} scale={[1, 1, 1]} rotation={[0, Math.PI, 0]} {...props}>
-      <ArmTestingPosModel />
+      <ArmTestingPosModel hovered={hovered} clickTrigger={clickTrigger} />
     </group>
   );
 }
 
-function ButtonCube() {
+// ButtonCube agora usa forwardRef para expor o mesh
+const ButtonCube = forwardRef<THREE.Mesh, { hovered: boolean, onCubeClick: () => void }>(function ButtonCube({ hovered, onCubeClick }, ref) {
+  const { scale } = useSpring({
+    scale: hovered ? 1.2 : 1,
+    config: { tension: 300, friction: 20 }
+  });
   return (
-    <mesh
+    <a.mesh
+      ref={ref}
       position={[1, 1, 0]}
-      onClick={() => console.log('Botão (cubo) clicado!')}
+      scale={scale}
+      onClick={() => {
+        onCubeClick();
+        console.log('Botão (cubo) clicado!');
+      }}
       castShadow
       receiveShadow
     >
       <boxGeometry args={[0.5, 0.5, 0.5]} />
       <meshStandardMaterial color="orange" />
-    </mesh>
+    </a.mesh>
   );
-}
+});
 
 function AxesHelperPrimitive({ size = 2 }) {
   const ref = useRef<any>();
@@ -143,11 +164,32 @@ function AxesHelperPrimitive({ size = 2 }) {
   return null;
 }
 
+// Componente auxiliar para raycast FPS hover
+function CubeRaycastHover({ cubeRef, setCubeHovered }: { cubeRef: React.RefObject<THREE.Mesh | null>, setCubeHovered: (v: boolean) => void }) {
+  useFrame(({ camera }) => {
+    const raycaster = new THREE.Raycaster();
+    const center = new THREE.Vector2(0, 0);
+    raycaster.setFromCamera(center, camera);
+    const cube = cubeRef.current;
+    let isHovering = false;
+    if (cube) {
+      const intersects = raycaster.intersectObject(cube, false);
+      isHovering = intersects.length > 0;
+    }
+    setCubeHovered(isHovering);
+  });
+  return null;
+}
+
 export default function FullScene() {
+  const [cubeHovered, setCubeHovered] = useState(false);
+  const [armClickTrigger, setArmClickTrigger] = useState(0);
+  const cubeRef = useRef<THREE.Mesh>(null);
+
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#222" }}>
       <Canvas shadows>
-        <fog attach="fog" color="#222" near={1} far={10} />
+        <fog attach="fog" color="#222" near={1} far={10} args={["#222", 1, 10]} />
         <Suspense fallback={null}>
           <PerspectiveCamera 
             makeDefault 
@@ -156,9 +198,10 @@ export default function FullScene() {
           />
           <ambientLight intensity={0.5} />
           <directionalLight position={[5, 10, 7]} intensity={1} castShadow />
-          <ArmAttachedToCamera />
+          <ArmAttachedToCamera hovered={cubeHovered} clickTrigger={armClickTrigger} />
           <FloorModel position={[0, 0, 0]} />
-          <ButtonCube />
+          <ButtonCube hovered={cubeHovered} ref={cubeRef} onCubeClick={() => setArmClickTrigger(t => t + 1)} />
+          <CubeRaycastHover cubeRef={cubeRef} setCubeHovered={setCubeHovered} />
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
             <GizmoViewport axisColors={["red", "green", "blue"]} labelColor="white" />
           </GizmoHelper>
