@@ -83,8 +83,6 @@ function ArmTestingPosModel(props: any) {
 
   return <primitive ref={group} object={scene} {...props} />;
 }
-// Preload para performance
-if (typeof window !== 'undefined') useGLTF.preload && useGLTF.preload('/armTestingPos.glb');
 
 function FloorModel(props: any) {
   const group = useRef<Group>(null);
@@ -116,6 +114,20 @@ function ArmAttachedToCamera(props: any) {
   );
 }
 
+function ButtonCube() {
+  return (
+    <mesh
+      position={[1, 1, 0]}
+      onClick={() => console.log('Botão (cubo) clicado!')}
+      castShadow
+      receiveShadow
+    >
+      <boxGeometry args={[0.5, 0.5, 0.5]} />
+      <meshStandardMaterial color="orange" />
+    </mesh>
+  );
+}
+
 function AxesHelperPrimitive({ size = 2 }) {
   const ref = useRef<any>();
   const { scene } = useThree();
@@ -135,6 +147,7 @@ export default function FullScene() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#222" }}>
       <Canvas shadows>
+        <fog attach="fog" color="#222" near={1} far={10} />
         <Suspense fallback={null}>
           <PerspectiveCamera 
             makeDefault 
@@ -145,12 +158,11 @@ export default function FullScene() {
           <directionalLight position={[5, 10, 7]} intensity={1} castShadow />
           <ArmAttachedToCamera />
           <FloorModel position={[0, 0, 0]} />
-          <Grid infiniteGrid cellColor="#444" sectionColor="#888" fadeDistance={40} />
-          <AxesHelperPrimitive size={2} />
+          <ButtonCube />
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
             <GizmoViewport axisColors={["red", "green", "blue"]} labelColor="white" />
           </GizmoHelper>
-          <Environment preset="city" background={false} />
+          <Environment preset="studio" background={false} />
         </Suspense>
         <PointerLockControls />
       </Canvas>
