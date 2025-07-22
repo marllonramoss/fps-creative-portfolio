@@ -2,12 +2,15 @@
 import React, { Suspense, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PointerLockControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera, Environment, useGLTF } from "@react-three/drei";
-import { Group, AxesHelper } from "three";
+import { Group, AxesHelper, AnimationMixer } from "three";
 import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 
 function ArmTestingPosModel(props: any) {
   const group = useRef<Group>(null);
-  const { scene } = useGLTF('/armTestingPos.glb');
+  const { scene, animations } = useGLTF('/hoho.glb');
+  const mixer = React.useRef<AnimationMixer | null>(null);
+  const action = React.useRef<any>(null);
 
   // Torna todos os materiais wireframe e transparentes
   React.useEffect(() => {
@@ -19,6 +22,62 @@ function ArmTestingPosModel(props: any) {
       }
     });
   }, [scene]);
+
+  // Loga as animações do modelo
+  React.useEffect(() => {
+    if (animations && animations.length > 0) {
+      console.log('GLB Animations:', animations);
+    } else {
+      console.log('GLB não possui animações.');
+    }
+  }, [animations]);
+
+  // Setup AnimationMixer e evento de clique
+  React.useEffect(() => {
+    if (!group.current || !animations || animations.length === 0) return;
+    mixer.current = new AnimationMixer(group.current);
+    // Procura a animação chamada 'press'
+    const clip = animations.find((a: any) => a.name === 'press');
+    let onFinish: ((event: any) => void) | undefined;
+    if (clip) {
+      action.current = mixer.current.clipAction(clip);
+      action.current.setLoop(THREE.LoopOnce, 1);
+      action.current.clampWhenFinished = true;
+      action.current.paused = false;
+      action.current.enabled = true;
+      action.current.stop();
+      action.current.reset();
+      (action.current as any)._hasPlayed = false;
+      // Listener para liberar novo clique
+      onFinish = (event: any) => {
+        if (event.action === action.current) {
+          (action.current as any)._hasPlayed = false;
+        }
+      };
+      mixer.current.removeEventListener('finished', onFinish);
+      mixer.current.addEventListener('finished', onFinish);
+    }
+    // Handler para clique esquerdo
+    const handleClick = (e: MouseEvent) => {
+      if (e.button === 0 && action.current) {
+        if (!(action.current as any)._hasPlayed) {
+          action.current.reset().play();
+          (action.current as any)._hasPlayed = true;
+        }
+      }
+    };
+    window.addEventListener('mousedown', handleClick);
+    return () => {
+      window.removeEventListener('mousedown', handleClick);
+      if (mixer.current) mixer.current.stopAllAction();
+      if (mixer.current && onFinish) mixer.current.removeEventListener('finished', onFinish);
+    };
+  }, [animations]);
+
+  // Atualiza o mixer a cada frame
+  useFrame((_, delta) => {
+    if (mixer.current) mixer.current.update(delta);
+  });
 
   return <primitive ref={group} object={scene} {...props} />;
 }
