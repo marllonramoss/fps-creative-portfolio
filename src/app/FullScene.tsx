@@ -138,6 +138,13 @@ function ArmAttachedToCamera(props: any) {
   const { camera, scene } = useThree();
   const ref = useRef<Group>(null);
 
+  // Parâmetros de suavização
+  const lerpAlpha = 0.1;
+  const swayAmount = 0.25; // ajuste para mais/menos sway
+
+  // Guarda a rotação inicial da câmera
+  const initialRotation = useRef(new THREE.Euler().copy(camera.rotation));
+
   useEffect(() => {
     if (ref.current && camera && !camera.children.includes(ref.current)) {
       camera.add(ref.current);
@@ -150,9 +157,27 @@ function ArmAttachedToCamera(props: any) {
     };
   }, [camera, scene]);
 
-  // Ajuste a posição para onde o braço deve aparecer na tela
+  useFrame(() => {
+    if (ref.current) {
+      // Sway baseado na diferença da rotação atual para a inicial
+      const yawDiff = camera.rotation.y - initialRotation.current.y;
+      const pitchDiff = camera.rotation.x - initialRotation.current.x;
+
+      // Limite o sway para evitar jumps extremos
+      const swayX = THREE.MathUtils.clamp(-yawDiff * swayAmount, -0.3, 0.3);
+      const swayY = THREE.MathUtils.clamp(-pitchDiff * swayAmount, -0.2, 0.2);
+
+      // Posição alvo com sway
+      const targetPosition = new THREE.Vector3(-0.1 + swayX, -0.5 + swayY, 0.3);
+      ref.current.position.lerp(targetPosition, lerpAlpha);
+
+      // Mantenha a rotação fixa
+      ref.current.rotation.set(0, Math.PI, 0);
+    }
+  });
+
   return (
-    <group ref={ref} position={[-0.1, -0.5, 0.3]} scale={[1, 1, 1]} rotation={[0, Math.PI, 0]} {...props}>
+    <group ref={ref}>
       <ArmTestingPosModel hovered={hovered} clickTrigger={clickTrigger} />
     </group>
   );
