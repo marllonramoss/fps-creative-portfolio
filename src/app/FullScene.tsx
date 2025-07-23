@@ -15,6 +15,7 @@ function ArmTestingPosModel(props: any) {
   const hoverInAction = React.useRef<any>(null);
   const hoverOutAction = React.useRef<any>(null);
   const pressAction = React.useRef<any>(null);
+  const idleAction = React.useRef<any>(null);
 
   // Torna todos os materiais wireframe e transparentes
   React.useEffect(() => {
@@ -60,9 +61,41 @@ function ArmTestingPosModel(props: any) {
       pressAction.current.stop();
       pressAction.current.reset();
     }
+    const idleClip = animations.find((a: any) => a.name === 'idle');
+    if (idleClip) {
+      idleAction.current = mixer.current.clipAction(idleClip);
+      idleAction.current.setLoop(THREE.LoopRepeat, Infinity);
+      idleAction.current.clampWhenFinished = false;
+      idleAction.current.enabled = true;
+      idleAction.current.play();
+    }
     return () => {
       if (mixer.current) mixer.current.stopAllAction();
     };
+  }, [animations]);
+
+  // Listener para voltar para idle ao terminar hoverOut ou press
+  React.useEffect(() => {
+    if (!mixer.current) return;
+    const onFinish = (event: any) => {
+      if (
+        (hoverOutAction.current && event.action === hoverOutAction.current) ||
+        (pressAction.current && event.action === pressAction.current)
+      ) {
+        idleAction.current?.reset().play();
+      }
+    };
+    mixer.current.addEventListener('finished', onFinish);
+    return () => {
+      mixer.current?.removeEventListener('finished', onFinish);
+    };
+  }, [animations]);
+
+  // Loga os nomes das animações do modelo ao carregar
+  React.useEffect(() => {
+    if (animations && animations.length > 0) {
+      console.log('GLB Animations:', animations.map(a => a.name));
+    }
   }, [animations]);
 
   // Executa hoverIn/hoverOut conforme hovered
